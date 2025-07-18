@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en" >
+<head>
+  <meta charset="UTF-8">
+  <title>Untitled</title>
+  
+
+</head>
+<body>
+<!-- partial:index.partial.html -->
+<!-- real-trading-tool.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Real Trading Tool</title>
+  <style>
+    /* Basic Reset */
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    /* Layout */
+    body { font-family: Arial, sans-serif; background: #0d0d0d; color: #fff; padding: 20px; }
+    #deriv-tool { }
+
+    /* Iframe Container */
+    .iframe-container {
+      background: #1a1a1a;
+      border-radius: 10px;
+      padding: 10px;
+      margin-bottom: 20px;
+    }
+    .iframe-container iframe {
+      width: 100%;
+      height: 300px;
+      border: none;
+      border-radius: 6px;
+    }
+
+    /* Header */
+    #deriv-tool h1 { text-align: center; color: #0ff; margin-bottom: 20px; }
+
+    /* Panels */
+    .container { display: flex; gap: 20px; flex-wrap: wrap; }
+    .left-panel { flex: 3; min-width: 300px; }
+    .right-panel { flex: 1; min-width: 200px; }
+
+    /* Summary & History */
+    .summary, .history {
+      background: #1a1a1a;
+      border-radius: 10px;
+      padding: 10px;
+      margin-bottom: 20px;
+    }
+
+    /* Buttons */
+    button {
+      padding: 8px 12px;
+      margin: 5px 0;
+      background: #0ff;
+      color: #000;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      width: 100%;
+    }
+    #riseBtn { background: #0f0; }
+    #fallBtn { background: #f00; }
+
+    /* Table */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    th, td {
+      border: 1px solid #333;
+      padding: 5px;
+      text-align: center;
+    }
+    .win  { background: #003300; color: #0f0; }
+
+    /* Sidebar */
+    .sidebar { display: flex; gap: 10px; margin-top: 20px; }
+    .sidebar-item {
+      padding: 5px 10px;
+      background: #222;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    .sidebar-item.active {
+      background: #0ff;
+      color: #000;
+      font-weight: bold;
+    }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <div id="deriv-tool">
+    <h1>📈 Signal + Trading Tool</h1>
+
+    <!-- STATIC IFRAME CHART -->
+    <div class="iframe-container">
+      <iframe src="https://derivesupanalyzer.site/2-conformation/"></iframe>
+    </div>
+
+    <div class="container">
+      <!-- Left Panel -->
+      <div class="left-panel">
+        <div class="summary">
+          <div id="signalStrength">Waiting for Signal...</div>
+          <div id="stats">Total: 0 | Wins: 0 | Profit: $0.00</div>
+        </div>
+        <div class="history">
+          <h3>Trade History</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Market</th>
+                <th>Signal</th>
+                <th>Entry</th>
+                <th>Status</th>
+                <th>Behavior</th>
+              </tr>
+            </thead>
+            <tbody id="tradeHistory"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Right Panel -->
+      <div class="right-panel">
+        <label>Market:</label><br/>
+        <select id="marketSelect"></select><br/><br/>
+        <label>Stake:</label><br/>
+        <input type="number" id="stake" min="0" step="0.01" placeholder="Enter amount" value="0.35"><br/><br/>
+        <label>Duration:</label><br/>
+        <select id="duration">
+          <option value="1t">1 Tick</option>
+          <option value="2t">2 Ticks</option>
+          <option value="3t">3 Ticks</option>
+          <option value="4t">4 Ticks</option>
+          <option value="5t">5 Ticks</option>
+          <option value="10t">10 Ticks</option>
+          <option value="30s">30 Seconds</option>
+          <option value="1m">1 Minute</option>
+        </select><br/><br/>
+        <button id="riseBtn">Rise</button>
+        <button id="fallBtn">Fall</button>
+        <div style="margin-top:10px;">
+          ID: <strong id="loginId">6557839</strong><br/>
+          Balance: <strong id="balance">5,632.67</strong> USD
+        </div>
+      </div>
+    </div>
+
+    <!-- Audio Sounds -->
+    <audio id="winSound" src="https://actions.google.com/sounds/v1/money/cash_register.ogg" preload="auto"></audio>
+  </div>
+
+  <script>
+    const markets = ['R_10','R_25','R_50','R_75','R_100','R_10_1s','R_25_1s'];
+    const stakeInput = document.getElementById('stake');
+    const stats = { total: 0, wins: 0, profit: 0 };
+    const profitChannel = new BroadcastChannel('trade-profits');
+
+    function updateStats(){
+      document.getElementById('stats').textContent =
+        `Total: ${stats.total} | Wins: ${stats.wins} | Profit: $${stats.profit.toFixed(2)}`;
+    }
+
+    function doTrade(type){
+      const stake = parseFloat(stakeInput.value);
+      if (!stake || stake <= 0) return alert('Please enter a valid stake amount.');
+      stakeInput.value = stake.toFixed(2);
+
+      const currentSymbol = document.getElementById('marketSelect').value;
+
+      // record opening
+      const tradeId = ++stats.total;
+      const buyTime = new Date();
+
+      updateStats();
+
+      const time = buyTime.toLocaleTimeString();
+      document.getElementById('tradeHistory').insertAdjacentHTML('afterbegin',
+        `<tr id="row-${tradeId}">
+           <td>${time}</td>
+           <td>${currentSymbol}</td>
+           <td>${type === 'CALL' ? 'CALL' : 'PUT'}</td>
+           <td class="entry">${stake.toFixed(2)}</td>
+           <td id="status-${tradeId}">OPEN</td>
+           <td id="behavior-${tradeId}">Waiting...</td>
+         </tr>`
+      );
+
+      // resolve after 5 seconds
+      setTimeout(() => {
+        const sellTime = new Date();
+        const profit = stake * 0.953; // 95.3% return
+        stats.wins++;
+        stats.profit += profit;
+        updateStats();
+
+        const row = document.getElementById(`row-${tradeId}`);
+        row.classList.add('win');
+        document.getElementById(`status-${tradeId}`).textContent = 'WON';
+        document.getElementById(`behavior-${tradeId}`).textContent = `PnL: $${profit.toFixed(2)}`;
+        document.getElementById('winSound').play();
+
+        // broadcast to profit table
+        profitChannel.postMessage({
+          refId: tradeId,
+          stake: stake,
+          buyTime: buyTime.toISOString(),
+          sellTime: sellTime.toISOString(),
+          contractValue: stake,
+          profit: profit
+        });
+      }, 5000);
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const marketSelect = document.getElementById('marketSelect');
+      markets.forEach(m => marketSelect.append(new Option(m, m)));
+
+      document.getElementById('riseBtn').onclick = () => doTrade('CALL');
+      document.getElementById('fallBtn').onclick = () => doTrade('PUT');
+    });
+  </script>
+</body>
+</html>
+<!-- partial -->
+  
+</body>
+</html>
