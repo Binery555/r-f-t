@@ -10,13 +10,7 @@
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     /* Layout */
-    body {
-      font-family: Arial, sans-serif;
-      background: #0d0d0d url('path/to/your/photo.jpg') no-repeat center center;
-      background-size: cover;           /* scales background like your photo */
-      color: #fff;
-      padding: 20px;
-    }
+    body { font-family: Arial, sans-serif; background: #0d0d0d; color: #fff; padding: 20px; }
     #deriv-tool { }
 
     /* Iframe Container */
@@ -34,43 +28,12 @@
     }
 
     /* Header */
-    #deriv-tool h1 {
-      text-align: center;
-      color: #0ff;
-      margin-bottom: 20px;
-    }
+    #deriv-tool h1 { text-align: center; color: #0ff; margin-bottom: 20px; }
 
     /* Panels */
-    .container {
-      display: flex;
-      gap: 20px;
-      flex-wrap: wrap;
-    }
-    .left-panel {
-      flex: 3;
-      min-width: 300px;
-    }
-    .right-panel {
-      flex: 1;
-      min-width: 200px;
-      background: #1a1a1a;
-      border-radius: 10px;
-      padding: 15px;
-    }
-
-    /* ——— Control Boxes ——— */
-    .right-panel select,
-    .right-panel input {
-      width: 100%;
-      height: 40px;                    /* match screenshot height */
-      background: #fff;                /* white box */
-      color: #000;                     /* black text */
-      font-size: 16px;
-      padding: 0 10px;
-      border: 1px solid #333;
-      border-radius: 6px;              /* rounded corners */
-      margin-bottom: 15px;
-    }
+    .container { display: flex; gap: 20px; flex-wrap: wrap; }
+    .left-panel { flex: 3; min-width: 300px; }
+    .right-panel { flex: 1; min-width: 200px; }
 
     /* Summary & History */
     .summary, .history {
@@ -78,6 +41,21 @@
       border-radius: 10px;
       padding: 10px;
       margin-bottom: 20px;
+    }
+
+    /* Styled inputs & selects */
+    #marketSelect,
+    #stake,
+    #duration {
+      width: 100%;
+      height: 40px;
+      padding: 8px;
+      font-size: 16px;
+      background: #fff;
+      color: #000;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      margin-bottom: 12px;
     }
 
     /* Buttons */
@@ -107,6 +85,21 @@
     }
     .win  { background: #003300; color: #0f0; }
     .loss { background: #330000; color: #f00; }
+
+    /* Sidebar */
+    .sidebar { display: flex; gap: 10px; margin-top: 20px; }
+    .sidebar-item {
+      padding: 5px 10px;
+      background: #222;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    .sidebar-item.active {
+      background: #0ff;
+      color: #000;
+      font-weight: bold;
+    }
+    .hidden { display: none; }
   </style>
 </head>
 <body>
@@ -123,7 +116,7 @@
       <div class="left-panel">
         <div class="summary">
           <div id="signalStrength">Waiting for Signal...</div>
-          <div id="stats">Total: 0 | Wins: 0 | Losses: 0 | Profit: $0.00</div>
+          <div id="stats">Total: 0 | Wins: 0 | Profit: $0.00</div>
         </div>
         <div class="history">
           <h3>Trade History</h3>
@@ -145,13 +138,13 @@
 
       <!-- Right Panel -->
       <div class="right-panel">
-        <label>Market:</label><br/>
+        <label>Market:</label>
         <select id="marketSelect"></select>
 
-        <label>Stake:</label><br/>
+        <label>Stake:</label>
         <input type="number" id="stake" min="0" step="0.01" placeholder="Enter amount" value="0.35">
 
-        <label>Duration:</label><br/>
+        <label>Duration:</label>
         <select id="duration">
           <option value="1t">1 Tick</option>
           <option value="2t">2 Ticks</option>
@@ -166,7 +159,7 @@
         <button id="riseBtn">Rise</button>
         <button id="fallBtn">Fall</button>
 
-        <div style="margin-top:10px; color:#0ff;">
+        <div style="margin-top:12px;">
           ID: <strong id="loginId">6557839</strong><br/>
           Balance: <strong id="balance">5,632.67</strong> USD
         </div>
@@ -178,57 +171,58 @@
   </div>
 
   <script>
-    const markets = ['R_10','R_25','R_50','R_75','R_100','R_10_1s','R_25_1s'];
-    let lossSequence = [];
-    const stats = { total: 0, wins: 0, losses: 0, profit: 0 };
-
-    // Generate a shuffled array of 50 outcomes: 8 losses (false), 42 wins (true)
-    function generateLossSequence() {
-      const wins  = Array(42).fill(true);
-      const losses= Array( 8).fill(false);
-      const seq   = wins.concat(losses);
-      for (let i = seq.length - 1; i > 0; i--) {
+    // prepare a 50‑trade cycle with exactly 8 losses
+    let simulationResults = [];
+    function initializeSimulation() {
+      simulationResults = [];
+      // 8 losses (false) and 42 wins (true)
+      for (let i = 0; i < 8; i++) simulationResults.push(false);
+      for (let i = 0; i < 42; i++) simulationResults.push(true);
+      // Fisher–Yates shuffle
+      for (let i = simulationResults.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
-        [seq[i], seq[j]] = [seq[j], seq[i]];
+        [simulationResults[i], simulationResults[j]] = [simulationResults[j], simulationResults[i]];
       }
-      lossSequence = seq;
     }
 
-    function updateStats() {
+    const markets = ['R_10','R_25','R_50','R_75','R_100','R_10_1s','R_25_1s'];
+    const stakeInput = document.getElementById('stake');
+    const stats = { total: 0, wins: 0, profit: 0 };
+    const profitChannel = new BroadcastChannel('trade-profits');
+
+    function updateStats(){
       document.getElementById('stats').textContent =
-        `Total: ${stats.total} | Wins: ${stats.wins} | Losses: ${stats.losses} | Profit: $${stats.profit.toFixed(2)}`;
+        `Total: ${stats.total} | Wins: ${stats.wins} | Profit: $${stats.profit.toFixed(2)}`;
     }
 
-    function doTrade(type) {
-      const stake = parseFloat(document.getElementById('stake').value);
+    function doTrade(type){
+      const stake = parseFloat(stakeInput.value);
       if (!stake || stake <= 0) return alert('Please enter a valid stake amount.');
+      stakeInput.value = stake.toFixed(2);
 
-      // If this is the first trade in a 50-trade block, regen the sequence
-      if (stats.total % 50 === 0) generateLossSequence();
+      const currentSymbol = document.getElementById('marketSelect').value;
+      const tradeId = ++stats.total;
+      const buyTime = new Date();
 
-      stats.total++;
       updateStats();
 
-      const tradeId    = stats.total;
-      const buyTime    = new Date();
-      const currentSym = document.getElementById('marketSelect').value;
-      const isWin      = lossSequence[stats.total - 1];
+      const time = buyTime.toLocaleTimeString();
+      document.getElementById('tradeHistory').insertAdjacentHTML('afterbegin',
+        `<tr id="row-${tradeId}">
+           <td>${time}</td>
+           <td>${currentSymbol}</td>
+           <td>${type === 'CALL' ? 'CALL' : 'PUT'}</td>
+           <td class="entry">${stake.toFixed(2)}</td>
+           <td id="status-${tradeId}">OPEN</td>
+           <td id="behavior-${tradeId}">Waiting...</td>
+         </tr>`
+      );
 
-      const rowHtml = `
-        <tr id="row-${tradeId}">
-          <td>${buyTime.toLocaleTimeString()}</td>
-          <td>${currentSym}</td>
-          <td>${type === 'CALL' ? 'CALL' : 'PUT'}</td>
-          <td class="entry">${stake.toFixed(2)}</td>
-          <td id="status-${tradeId}">OPEN</td>
-          <td id="behavior-${tradeId}">Waiting...</td>
-        </tr>`;
-      document.getElementById('tradeHistory').insertAdjacentHTML('afterbegin', rowHtml);
-
-      // Resolve after 5 seconds
+      // resolve after 5 seconds
       setTimeout(() => {
-        const sellTime = new Date();
-        const row      = document.getElementById(`row-${tradeId}`);
+        const isWin = simulationResults[(tradeId - 1) % simulationResults.length];
+        const row     = document.getElementById(`row-${tradeId}`);
+
         if (isWin) {
           const profit = stake * 0.953; // 95.3% return
           stats.wins++;
@@ -237,28 +231,38 @@
           document.getElementById(`status-${tradeId}`).textContent   = 'WON';
           document.getElementById(`behavior-${tradeId}`).textContent = `PnL: $${profit.toFixed(2)}`;
           document.getElementById('winSound').play();
+
+          // broadcast to profit table
+          profitChannel.postMessage({
+            refId: tradeId,
+            stake,
+            buyTime: buyTime.toISOString(),
+            sellTime: new Date().toISOString(),
+            contractValue: stake,
+            profit
+          });
         } else {
-          stats.losses++;
           stats.profit -= stake;
           row.classList.add('loss');
           document.getElementById(`status-${tradeId}`).textContent   = 'LOST';
           document.getElementById(`behavior-${tradeId}`).textContent = `PnL: -$${stake.toFixed(2)}`;
+          updateStats();
         }
         updateStats();
       }, 5000);
     }
 
     document.addEventListener('DOMContentLoaded', () => {
-      // populate markets
-      const mSelect = document.getElementById('marketSelect');
-      markets.forEach(m => mSelect.append(new Option(m, m)));
-
-      // generate the first sequence
-      generateLossSequence();
+      // fill markets
+      const marketSelect = document.getElementById('marketSelect');
+      markets.forEach(m => marketSelect.append(new Option(m, m)));
 
       // wire buttons
       document.getElementById('riseBtn').onclick = () => doTrade('CALL');
       document.getElementById('fallBtn').onclick = () => doTrade('PUT');
+
+      // init the 50‑trade cycle
+      initializeSimulation();
     });
   </script>
 </body>
