@@ -69,6 +69,7 @@
       text-align: center;
     }
     .win  { background: #003300; color: #0f0; }
+    .loss { background: #330000; color: #f00; }
 
     /* Sidebar */
     .sidebar { display: flex; gap: 10px; margin-top: 20px; }
@@ -84,6 +85,20 @@
       font-weight: bold;
     }
     .hidden { display: none; }
+
+    /* Input / Select sizing */
+    #marketSelect,
+    #stake,
+    #duration {
+      width: 180px;
+      height: 38px;
+      background: #fff;
+      color: #000;
+      border: 1px solid #888;
+      border-radius: 5px;
+      padding: 0 10px;
+      font-size: 16px;
+    }
   </style>
 </head>
 <body>
@@ -125,7 +140,7 @@
         <label>Market:</label><br/>
         <select id="marketSelect"></select><br/><br/>
         <label>Stake:</label><br/>
-        <input type="number" id="stake" min="0" step="0.01" placeholder="Enter amount" value="0.35"><br/><br/>
+        <input type="number" id="stake" min="0" step="0.01" value="0.35"><br/><br/>
         <label>Duration:</label><br/>
         <select id="duration">
           <option value="1t">1 Tick</option>
@@ -151,6 +166,22 @@
   </div>
 
   <script>
+    // Pre-generate 50 outcomes with exactly 5 losses, randomly placed with no consecutive losses
+    const outcomes = Array(50).fill('win');
+    let placed = 0;
+    while (placed < 5) {
+      const idx = Math.floor(Math.random() * 50);
+      // ensure no existing loss here and no adjacent loss
+      if (
+        outcomes[idx] === 'win' &&
+        (idx === 0        || outcomes[idx - 1] !== 'loss') &&
+        (idx === 49       || outcomes[idx + 1] !== 'loss')
+      ) {
+        outcomes[idx] = 'loss';
+        placed++;
+      }
+    }
+
     const markets = ['R_10','R_25','R_50','R_75','R_100','R_10_1s','R_25_1s'];
     const stakeInput = document.getElementById('stake');
     const stats = { total: 0, wins: 0, profit: 0 };
@@ -171,7 +202,6 @@
       // record opening
       const tradeId = ++stats.total;
       const buyTime = new Date();
-
       updateStats();
 
       const time = buyTime.toLocaleTimeString();
@@ -189,16 +219,25 @@
       // resolve after 5 seconds
       setTimeout(() => {
         const sellTime = new Date();
-        const profit = stake * 0.953; // 95.3% return
-        stats.wins++;
-        stats.profit += profit;
+        const outcome = tradeId <= outcomes.length ? outcomes[tradeId - 1] : 'win';
+        const isWin = outcome === 'win';
+        const profitVar = isWin ? stake * 0.953 : -stake;
+
+        if (isWin) stats.wins++;
+        stats.profit += profitVar;
         updateStats();
 
         const row = document.getElementById(`row-${tradeId}`);
-        row.classList.add('win');
-        document.getElementById(`status-${tradeId}`).textContent = 'WON';
-        document.getElementById(`behavior-${tradeId}`).textContent = `PnL: $${profit.toFixed(2)}`;
-        document.getElementById('winSound').play();
+        if (isWin) {
+          row.classList.add('win');
+          document.getElementById(`status-${tradeId}`).textContent = 'WON';
+          document.getElementById(`behavior-${tradeId}`).textContent = `PnL: $${profitVar.toFixed(2)}`;
+          document.getElementById('winSound').play();
+        } else {
+          row.classList.add('loss');
+          document.getElementById(`status-${tradeId}`).textContent = 'LOST';
+          document.getElementById(`behavior-${tradeId}`).textContent = `PnL: $${profitVar.toFixed(2)}`;
+        }
 
         // broadcast to profit table
         profitChannel.postMessage({
@@ -207,7 +246,7 @@
           buyTime: buyTime.toISOString(),
           sellTime: sellTime.toISOString(),
           contractValue: stake,
-          profit: profit
+          profit: profitVar
         });
       }, 5000);
     }
