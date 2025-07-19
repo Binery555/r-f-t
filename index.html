@@ -1,4 +1,4 @@
-<!-- real-trading-tool.html -->
+<!-- real-trading-tool.html --> 
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -171,7 +171,6 @@
     let placed = 0;
     while (placed < 5) {
       const idx = Math.floor(Math.random() * 50);
-      // ensure no existing loss here and no adjacent loss
       if (
         outcomes[idx] === 'win' &&
         (idx === 0        || outcomes[idx - 1] !== 'loss') &&
@@ -185,11 +184,20 @@
     const markets = ['R_10','R_25','R_50','R_75','R_100','R_10_1s','R_25_1s'];
     const stakeInput = document.getElementById('stake');
     const stats = { total: 0, wins: 0, profit: 0 };
+    // initialize balance from page
+    let balance = parseFloat(
+      document.getElementById('balance').textContent.replace(/,/g, '')
+    );
+
     const profitChannel = new BroadcastChannel('trade-profits');
 
     function updateStats(){
       document.getElementById('stats').textContent =
         `Total: ${stats.total} | Wins: ${stats.wins} | Profit: $${stats.profit.toFixed(2)}`;
+    }
+
+    function updateBalance(){
+      document.getElementById('balance').textContent = balance.toFixed(2);
     }
 
     function doTrade(type){
@@ -223,9 +231,12 @@
         const isWin = outcome === 'win';
         const profitVar = isWin ? stake * 0.953 : -stake;
 
+        // update stats & balance
         if (isWin) stats.wins++;
         stats.profit += profitVar;
+        balance += profitVar;
         updateStats();
+        updateBalance();
 
         const row = document.getElementById(`row-${tradeId}`);
         if (isWin) {
@@ -257,6 +268,9 @@
 
       document.getElementById('riseBtn').onclick = () => doTrade('CALL');
       document.getElementById('fallBtn').onclick = () => doTrade('PUT');
+
+      // initial render of balance
+      updateBalance();
     });
   </script>
 </body>
